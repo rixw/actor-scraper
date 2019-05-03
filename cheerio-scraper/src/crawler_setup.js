@@ -155,6 +155,7 @@ class CrawlerSetup {
                 newHeaders[key.toLowerCase()] = value;
                 return newHeaders;
             }, {});
+        console.log(JSON.stringify(request.headers));
 
         // Add initial cookies, if any.
         if (this.input.initialCookies.length) {
