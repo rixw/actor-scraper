@@ -136,6 +136,7 @@ class CrawlerSetup {
             requestOptions: {
                 jar: this.input.useCookieJar,
                 callback: (error, incomingMessage) => {
+                    console.log(incomingMessage.statusCode);
                     console.log(incomingMessage.rawHeaders);
                 },
             },
