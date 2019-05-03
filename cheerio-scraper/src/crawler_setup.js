@@ -135,7 +135,7 @@ class CrawlerSetup {
             },
             requestOptions: {
                 jar: this.input.useCookieJar,
-            }
+            },
         };
 
         this.crawler = new Apify.CheerioCrawler(options);
@@ -161,6 +161,7 @@ class CrawlerSetup {
                 cookie: cookieHeaderValue,
             });
         }
+        request.debug = true;
         return request;
     }
 
