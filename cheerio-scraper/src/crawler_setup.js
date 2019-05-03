@@ -135,6 +135,7 @@ class CrawlerSetup {
             },
             requestOptions: {
                 jar: this.input.useCookieJar,
+                debug: true,
             },
         };
 
@@ -161,7 +162,6 @@ class CrawlerSetup {
                 cookie: cookieHeaderValue,
             });
         }
-        request.debug = true;
         return request;
     }
 
