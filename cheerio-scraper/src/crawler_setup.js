@@ -135,6 +135,12 @@ class CrawlerSetup {
             },
             requestOptions: {
                 jar: this.input.useCookieJar,
+                headers: {
+                    'User-Agent':
+                        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.3',
+                    Accept: 'text/html',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                },
                 callback: (error, incomingMessage) => {
                     console.log(incomingMessage.statusCode);
                     console.log(incomingMessage.rawHeaders);
@@ -155,7 +161,6 @@ class CrawlerSetup {
                 newHeaders[key.toLowerCase()] = value;
                 return newHeaders;
             }, {});
-        console.log(JSON.stringify(request.headers));
 
         // Add initial cookies, if any.
         if (this.input.initialCookies.length) {
