@@ -130,7 +130,7 @@
             "unit": "secs"
         },
         "requestOptions": {
-            "title": "Custom data",
+            "title": "Request options",
             "type": "object",
             "description": "This object will be applied as options to the Request library.",
             "default": {
