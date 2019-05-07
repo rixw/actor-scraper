@@ -1,0 +1,70 @@
+{
+  "startUrls": [
+    {
+      "url": "https://www.ocado.com/browse/beer-wine-spirits-43510/wine-135827?display=2500",
+      "method": "GET",
+      "userData": {
+        "pageType": "plp"
+      }
+    },
+    {
+      "url": "https://www.ocado.com/browse/beer-wine-spirits-43510/sparkling-wine-43516?display=500",
+      "method": "GET",
+      "userData": {
+        "pageType": "plp"
+      }
+    },
+    {
+      "url": "https://www.ocado.com/browse/beer-wine-spirits-43510/beer-43517?display=1000",
+      "method": "GET",
+      "userData": {
+        "pageType": "plp"
+      }
+    },
+    {
+      "url": "https://www.ocado.com/browse/beer-wine-spirits-43510/spirits-43519?display=1000",
+      "method": "GET",
+      "userData": {
+        "pageType": "plp"
+      }
+    },
+    {
+      "url": "https://www.ocado.com/browse/beer-wine-spirits-43510/cider-43518?display=500",
+      "method": "GET",
+      "userData": {
+        "pageType": "plp"
+      }
+    },
+    {
+      "url": "https://www.ocado.com/browse/beer-wine-spirits-43510/low-no-alcohol-150978?display=300",
+      "method": "GET",
+      "userData": {
+        "pageType": "plp"
+      }
+    }
+  ],
+  "useRequestQueue": true,
+  "pageFunction": "async function pageFunction(context) {\n    const { $, request, response, log } = context;\n    const { url, userData, loadedUrl } = request;\n\n    $.prototype.match = function(pattern) {\n        if (this.length > 0 && pattern) {\n            return this.filter((i, el) => $(el).text().search(pattern) > -1);\n        }\n        return this;\n    };\n    $.prototype.firstText = function() {\n        const contents = this.first().text();\n        return contents ? contents.replace(/\\s\\s+/g, ' ').trim() : '';\n    };\n    $.prototype.eachText = function(joinWith) {\n        const result = [];\n        this.each((i, el) => result.push($(el).firstText()));\n        if (joinWith) return result.join(joinWith);\n        return result;\n    };\n\n    if (response.status >= 400) throw new Error(`URL: ${url} response status ${response.status}`);\n    if (userData.pageType === 'plp') return handlePlp();\n    if (userData.pageType === 'pdp') return handlePdp();\n\n    async function handlePdp() {\n        // Check we can get an ID\n        const idMatch = url.match(/\\/(\\d+)$/i);\n        if (!idMatch) return;\n        const id = idMatch[1];\n        log.info(`URL: ${url} ID: ${id}`);\n        const result = {\n            crawlName: 'ocado',\n            url: loadedUrl,\n            productId: id,\n        };\n\n\n        result.name = $('h1.productTitle strong[itemprop=name]').firstText();\n        result.vintage = prodInfo(/Current Vintage/i);\n        result.size = $('h1.productTitle').contents().filter(function() {\n            return this.nodeType === 3;\n        }).last().firstText();\n        result.abv = prodInfo(/ABV/i) ;\n        result.rating = $('p#rating').attr('title');\n        result.ratingCount = $('span.reviewCount').firstText();\n        result.description = $('div#bopBottom h2.bopSectionHeader').match(/Product Description/i).next('div.bopSection').children().eachText('\\n');\n        result.description2 = prodInfo(/Tasting Notes/i);\n        if (!result.description) {\n            result.description = result.description2;\n            result.description2 = prodInfo(/Serving Suggestions/i);\n        }\n        result.grapes = prodInfo(/Grape Variety/i);\n        result.country = prodInfo(/Country of Origin/i);\n        if (!result.country) result.country = prodInfo(/Country of Packing/i);\n        // result.region = $('').firstText();\n        // result.region2 = $('').firstText();\n        let categories = $('ul.categories li');\n        categories.each((i, el) => {\n            const entries = $(el).find('h4');\n            if (entries.length === 0) return;\n            if (!entries.firstText().startsWith('Beer, Wine & Spirits')) return;\n            let by = false;\n            entries.each((i, el) => {\n                if (!by && $(el).firstText().startsWith('By ')) by = true;\n            })\n            if (by) return;\n            result.breadcrumbs = entries.eachText();\n        });\n        result.bottleImage = new URL($('ul#galleryImages li.zoomable.first a').attr('href'), 'https://groceries.morrisons.com/').href;\n        // result.bannerImage = $('').firstText();\n        result.price = $('div.bopProductAndSubscriptionRow meta[itemprop=price]').attr('content');\n        result.offers = [];\n        const offers = $('div.productDescription p.onOffer');\n        offers.each((i, el) => {\n            result.offers.push({\n                text: $(el).attr('data-promotion-name'),\n                details: $(el).next('div.onOffer').children('span').firstText(),\n            });\n        });\n        result.available = $('div.bopProductAndSubscriptionRow input.productAdd').length > 0;\n        const lifestyle = $('ul.blocks li span.label').match(/Lifestyle/).parent().find('a').eachText();\n        result.vegan = lifestyle.filter(x => x.search(/Vegan/i) > -1).length > 0;\n        result.vegetarian = result.vegan || lifestyle.filter(x => x.search(/Vegetarian/i) > -1).length > 0;\n        result.organic = result.name.search(/Organic/i) > -1;\n        result.fairtrade = result.name.search(/Fairtrade/i) > -1;\n        // result.biodynamic = $('').length > 0;\n        return result;\n\n        function prodInfo(pattern) {\n            const h3 = $('div.productInfoSection h3').match(pattern);\n            const nextPara = h3.first().next('p').firstText();\n            return nextPara;\n        }\n    }\n\n    async function handlePlp() {\n        const scriptText = $('body > script').first().html();\n        const scriptObject = scriptText.trim().match(/^window\\.INITIAL_STATE = ({.*});$/);\n        if (scriptObject && scriptObject.length > 0) {\n            const initialState = scriptObject[1];\n            const state = JSON.parse(initialState);\n            if (state) {\n                // log.debug(JSON.stringify(state));\n                const { catalogue } = state;\n                const { productsPagesByRoute } = catalogue;\n                const keys = Object.keys(productsPagesByRoute);\n                const key = keys.filter(x => x.match(/browse/));\n                const route = productsPagesByRoute[key];\n                const { mainFopCollection } = route;\n                const { sections } = mainFopCollection;\n                const fops = [];\n                for (let i = 0; i < sections.length; i++) {\n                    fops.push(...sections[i].fops);\n                }\n                log.debug(`${url} has ${fops.length} products`);\n                for (let i = 0; i < fops.length; i++) {\n                    context.enqueueRequest({\n                        url: `https://www.ocado.com/webshop/product/slug/${fops[i].sku}`,\n                        userData: { pageType: 'pdp' },\n                    });\n                }\n            }\n        }\n    }\n}\n",
+  "proxyConfiguration": {
+    "useApifyProxy": false
+  },
+  "debugLog": true,
+  "ignoreSslErrors": false,
+  "maxRequestRetries": 0,
+  "maxPagesPerCrawl": 5000,
+  "maxConcurrency": 10,
+  "pageLoadTimeoutSecs": 60,
+  "pageFunctionTimeoutSecs": 360,
+  "requestOptions": {
+    "jar": false
+  },
+  "headers": {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.3",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Cache-Control": "max-age=0",
+    "Upgrade-Insecure-Requests": 1,
+    "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8"
+  }
+}

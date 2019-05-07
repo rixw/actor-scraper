@@ -1,0 +1,53 @@
+{
+  "startUrls": [
+    {
+      "url": "https://www.majestic.co.uk/wine?pageNum=0&pageSize=50",
+      "method": "GET"
+    },
+    {
+      "url": "https://www.majestic.co.uk/champagne?pageNum=0&pageSize=50",
+      "method": "GET"
+    },
+    {
+      "url": "https://www.majestic.co.uk/sparkling-wine?pageNum=0&pageSize=50",
+      "method": "GET"
+    },
+    {
+      "url": "https://www.majestic.co.uk/beer?pageNum=0&pageSize=50",
+      "method": "GET"
+    },
+    {
+      "url": "https://www.majestic.co.uk/cider?pageNum=0&pageSize=50",
+      "method": "GET"
+    },
+    {
+      "url": "https://www.majestic.co.uk/spirits?pageNum=0&pageSize=50",
+      "method": "GET"
+    }
+  ],
+  "useRequestQueue": true,
+  "pseudoUrls": [
+    {
+      "purl": "https://www.majestic.co.uk/[.*]",
+      "method": "GET"
+    }
+  ],
+  "linkSelector": "#search div.product-details__header h3 a, #search div.search-results__pagination a.button:not(a.button--primary)",
+  "pageFunction": "async function pageFunction(context) {\n    const { $, request, response, log, skipLinks } = context;\n    const { url } = request;\n\n    if (response.status >= 400) throw new Error(`URL: ${url} response status ${response.status}`);\n\n    $.prototype.match = function(pattern) {\n        if (this.length > 0 && pattern) {\n            return this.filter((i, el) => $(el).text().search(pattern) > -1);\n        }\n        return this;\n    };\n    $.prototype.firstText = function() {\n        const contents = this.first().text();\n        return contents ? contents.replace(/\\s\\s+/g, ' ').trim() : '';\n    };\n    $.prototype.eachText = function(joinWith) {\n        const result = [];\n        this.each((i, el) => result.push($(el).firstText()));\n        if (joinWith) return result.join(joinWith);\n        return result;\n    };\n    \n    // Check we can get an ID\n    const id = $('div.pdp__header div.row div.t-right span.t-bold').firstText();\n    if (!id) {\n        log.debug(`URL: ${url} no ID found`);\n        return;\n    }\n    log.debug(`URL: ${url} ID: ${id}`);\n    const result = {\n        crawlName: 'majestic',\n        url: request.url,\n        productId: id,\n    };\n\n    result.name = $('div.pdp__main h1.product-info__name').firstText();\n    result.size = $('div.pdp__main div.product-info__info div.product-info__symbol div.product-info__symbol-label').firstText();\n    result.abv = $('div.pdp__main table.content-table td').filter((i, el) => $(el).text() === 'ABV').siblings('td.content-table__text').firstText();\n    result.rating = $('div.pdp__main div.splodge span.js-percent').firstText();\n    result.ratingCount = $('div.pdp__main div.splodge span.js-raters').firstText();\n    result.style = $('div.pdp__main table.content-table td:contains(\"Style\")').siblings('td.content-table__text').firstText();\n    result.description = $('div.pdp__main p.product-content__description').firstText();\n    result.country = $('div.pdp__main table.content-table td')\n        .filter((i, el) => $(el).text() === 'Country')\n        .siblings('td.content-table__text')\n        .firstText();\n    result.breadcrumbs = $('div.pdp__header div.breadcrumbs a').eachText();\n    result.bottleImage = $('div.pdp__main div.product-image__container img').attr('src');\n    result.price = $('div.pdp__main div.product-action__price-container span.product-action__price-info').firstText();\n    result.offers = $('div.pdp__main div.product-action__price-container span.product-action__price-text').eachText();\n    result.available = $('div.pdp__main div.product-action__quantity').length > 0;\n    result.vegan = $('div.pdp__main div.js-symbols-tooltip:contains(\"VE\")').length > 0;\n    result.vegetarian = $('div.pdp__main div.js-symbols-tooltip:contains(\"V\")').length > 0;\n    result.organic = $('div.pdp__main div.js-symbols-tooltip g#icon-organic').length > 0;\n\n    return result;\n}",
+  "proxyConfiguration": {
+    "useApifyProxy": true
+  },
+  "debugLog": true,
+  "ignoreSslErrors": false,
+  "maxPagesPerCrawl": 1800,
+  "pageLoadTimeoutSecs": 30,
+  "headers": {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.3",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Cache-Control": "max-age=0",
+    "Upgrade-Insecure-Requests": 1,
+    "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8"
+  }
+}

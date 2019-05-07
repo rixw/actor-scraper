@@ -1,0 +1,20 @@
+{
+  "startUrls": [
+    {
+      "url": "https://apify.com"
+    }
+  ],
+  "useRequestQueue": true,
+  "pseudoUrls": [
+    {
+      "purl": "https://apify.com[(/[\\w-]+)?]"
+    }
+  ],
+  "linkSelector": "a",
+  "pageFunction": "async function pageFunction(context) {\n    const { $, request, log } = context;\n    const title = $('title').text();\n    log.info(`URL: ${request.url} TITLE: ${title}`);\n    return {\n        url: request.url,\n        title\n    };\n}",
+  "proxyConfiguration": {
+    "useApifyProxy": false
+  },
+  "debugLog": false,
+  "ignoreSslErrors": false
+}

@@ -1,0 +1,43 @@
+{
+  "startUrls": [
+    {
+      "url": "https://www.nakedwines.com/search/ajax?searchText=&pageSize=50&view=Wines&layoutType=list&allWines=true&pageNum=0&pageLayout=list",
+      "method": "GET"
+    },
+    {
+      "url": "https://www.nakedwines.com/search/ajax?searchText=gin&pageSize=50",
+      "method": "GET"
+    }
+  ],
+  "useRequestQueue": true,
+  "pseudoUrls": [
+    {
+      "purl": "https://www.nakedwines.com/[.*]",
+      "method": "GET"
+    }
+  ],
+  "linkSelector": "div.card__product--list a.card__header",
+  "pageFunction": "async function pageFunction(context) {\n    const { $, request, response, log, skipLinks } = context;\n    const { url } = request;\n\n    if (response.status >= 400) throw new Error(`URL: ${url} response status ${response.status}`);\n\n    handlePagination($);\n\n    $.prototype.match = function(pattern) {\n        if (this.length > 0 && pattern) {\n            return this.filter((i, el) => $(el).text().search(pattern) > -1);\n        }\n        return this;\n    };\n    $.prototype.firstText = function() {\n        const contents = this.first().text();\n        return contents ? contents.replace(/\\s\\s+/g, ' ').trim() : '';\n    };\n    $.prototype.eachText = function(joinWith) {\n        const result = [];\n        this.each((i, el) => result.push($(el).firstText()));\n        if (joinWith) return result.join(joinWith);\n        return result;\n    };\n    String.prototype.extract = function(pattern) {\n        const match = this.match(pattern);\n        if (match && match.length > 0) return match[0];\n        return '';\n    }\n    \n    // Check we can get an ID\n    const id = $('.wine-detail button.cart-add').attr('data-product-id');\n    if (!id) {\n        log.debug(`URL: ${url} no ID found`);\n        return;\n    }\n    log.debug(`URL: ${url} ID: ${id}`);\n    const result = {\n        crawlName: 'naked',\n        url: request.url,\n        productId: id.trim(),\n    };\n\n    result.name = $('.wine-detail strong[itemprop=\"name\"]').firstText();\n    result.size = $('.wine-detail .tab-content span')\n        .match(/(?:\\d+\\s*x\\s*)*(?:\\d*\\.)?(?:\\d+)\\s*(?:[cm]*(?:enti|illi)*li?t?r?e?r?s?)*/i)\n        .firstText();\n    result.style = $('.wine-detail .tab-content a[href*=\"wines/style\"]').firstText();\n    result.description = $('.wine-detail ul.list__tick-points li').firstText();\n    result.abv = $('.wine-detail .tab-content a[href*=\"filterWineAlcohol\"]').firstText();\n    result.country = $('.wine-detail .tab-content a[href*=\"wines/country\"]').firstText();\n    result.grapes = $('.wine-detail .tab-content a[href*=\"wines/grape\"]').firstText();\n    result.region = $('.wine-detail .tab-content a[href*=\"wines/country\"]').parent().match(/(?<=\\().+?(?=\\))/).firstText();\n    result.rating = $('.wine-detail div[itemprop=\"ratingValue\"]').firstText();\n    result.rating = $('.wine-detail span[itemprop=\"reviewCount\"]').firstText();\n    result.vegan = $('.wine-detail a[href=\"/wines/vegan\"]').match(/Vegan/i).length > 0;\n    result.vegetarian = $('.wine-detail a[href=\"/wines/vegetarian\"]').match(/Vegetarian/i).length > 0;\n    result.organic = $('.wine-detail a[href=\"/wines/organic\"]').match(/Organic/i).length > 0;\n    result.biodynamic = $('.wine-detail a[href=\"/wines/biodynamic\"]').match(/Biodynamic/i).length > 0;\n    result.bottleImage = $('.wine-detail img.bottle-shot').attr('src');\n    result.bannerImage = ($('.wine-detail header').attr('style') || '').extract(/(?<=url\\(').+?(?='\\))/i);\n    result.price = $('.wine-detail meta[itemprop=\"price\"]').attr('content');\n    result.offers = $('.wine-detail div.angel-price').first().eachText();\n    result.available = $('.wine-detail div.form__joined--atb').length > 0;\n\n    return result;\n\n    function handlePagination($) {\n        $('div.facts + div#load-more-container button#load-more-button').each((i, el) => {\n            const href = $(el).attr('data-next-url');\n            if (href) {\n                const url = new URL(href, 'https://www.nakedwines.com/');\n                context.enqueueRequest({ url: url.href });\n            }\n        });\n    }\n}",
+  "proxyConfiguration": {
+    "useApifyProxy": false
+  },
+  "debugLog": true,
+  "ignoreSslErrors": false,
+  "pageLoadTimeoutSecs": 30,
+  "initialCookies": [
+    {
+      "domain": "www.nakedwines.com",
+      "expirationDate": 4102444199,
+      "hostOnly": true,
+      "httpOnly": true,
+      "name": "cid",
+      "path": "/",
+      "sameSite": "no_restriction",
+      "secure": true,
+      "session": false,
+      "storeId": "0",
+      "value": "UK",
+      "id": 12
+    }
+  ]
+}

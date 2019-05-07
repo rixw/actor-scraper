@@ -1,0 +1,19 @@
+{
+  "startUrls": [
+    {
+      "requestsFromUrl": "https://api.apify.com/v2/actor-tasks/drinksight~waitrose-plp/runs/last/dataset/items?token=u49FCAvcAhJout44B87twufTQ&status=SUCCEEDED&clean=1&format=csv",
+      "method": "GET"
+    }
+  ],
+  "useRequestQueue": false,
+  "pageFunction": "async function pageFunction(context) {\n    const { $, request, log } = context;\n    const { url } = request;\n    \n\n    // jQuery extensions\n    $.prototype.match = function(pattern) {\n        if (this.length > 0 && pattern) {\n            return this.filter((i, el) => ($(el).text().search(pattern) > -1));\n        }\n        return this;\n    };\n    $.prototype.firstText = function() {\n        const contents = this.first().text();\n        return contents ? contents.replace(/\\s\\s+/g, ' ').trim() : '';\n    };\n    $.prototype.eachText = function() {\n        const result = [];\n        this.each((i, el) => result.push($(el).firstText()));\n        return result;\n    }\n\n    // Check we can get an ID\n    const idMatch = url.match(/\\/(\\d+-\\d+-\\d+)/i);\n    if (!idMatch) return;\n    const id = idMatch[1];\n    log.info(`URL: ${url} ID: ${id}`);\n    const result = {\n        crawlName: 'waitrose',\n        url: request.url,\n        productId: id,\n    };\n\n    result.name = $('h1#productName span[itemprop=name]').firstText();\n    result.size = $('h1#productName span[class^=size]').firstText();\n    result.abv = $('section#productDetails p[class^=\"label\"]').match(/Alcohol by volume/i).children('span[class^=\"value\"]').firstText();\n    result.rating = $('p[class^=\"starRating\"] span[itemprop=\"ratingValue\"]').firstText();\n    result.ratingCount = $('p[class^=\"starRating\"] span[itemprop=\"reviewCount\"]').firstText();\n    result.description = $('section#marketingDescriptionBop').firstText();\n    result.description2 = $('section#productDescription').firstText();\n    result.country = $('section#productDetails h3[class^=\"title\"]').match(/Origin Information/i).siblings('ul').children('li').firstText();\n    result.breadcrumbs = $('nav[class^=\"breadcrumbs\"] ul li[class^=\"crumb\"] a').eachText();\n    result.bottleImage = $('picture[class^=\"productDetails\"] img[itemprop=\"image\"]').attr('src');\n    result.price = $('section[class^=\"productPricing\"] span[data-test=\"product-pod-price\"]').firstText();\n    result.offers = $('section[class^=\"promotions\"] div[class^=\"offer_\"] a p').eachText();\n    result.available = $('section[class^=\"addToTrolley\"] div[class^=\"controlWithText\"] button:disabled').length === 0;\n    const lifestyles = $('section#productDetails h3[class^=\"title\"]').match(/Lifestyle/i).siblings('ul').children('li');\n    result.vegan = lifestyles.match(/Suitable for Vegans/i).length > 0;\n    result.vegetarian = lifestyles.match(/Suitable for Vegetarians/i).length > 0;\n    result.organic = $('li[data-type=\"organic\"]').length > 0;\n    result.fairtrade = $('li[data-type=\"fairtrade\"]').length > 0;\n\n    return result;\n}",
+  "proxyConfiguration": {
+    "useApifyProxy": true
+  },
+  "debugLog": false,
+  "ignoreSslErrors": false,
+  "maxRequestRetries": 3,
+  "maxPagesPerCrawl": 2500,
+  "maxConcurrency": 5,
+  "pageLoadTimeoutSecs": 30
+}
