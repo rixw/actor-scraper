@@ -164,7 +164,6 @@ class CrawlerSetup {
                 cookie: cookieHeaderValue,
             });
         }
-        log.debug(JSON.stringify(request, null, 2));
         return request;
     }
 
