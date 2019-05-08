@@ -1,0 +1,42 @@
+{
+  "startUrls": [
+    {
+      "url": "https://www.aldi.co.uk/c/wines/All-Wines",
+      "method": "GET",
+      "userData": {
+        "pageType": "plp"
+      }
+    },
+    {
+      "url": "https://www.aldi.co.uk/c/spirits/all-spirits",
+      "method": "GET",
+      "userData": {
+        "pageType": "plp"
+      }
+    }
+  ],
+  "useRequestQueue": true,
+  "pseudoUrls": [
+    {
+      "purl": "https://www.aldi.co.uk/[.*]",
+      "method": "GET",
+      "userData": {
+        "pageType": "pdp"
+      }
+    }
+  ],
+  "linkSelector": "div.category-wrapper div.category-item > a.category-item__wrapper-link",
+  "pageFunction": "async function pageFunction(context) {\n    const { request, response, log, waitFor } = context;\n    const { url, userData } = request;\n    const $ = context.jQuery;\n\n    $.prototype.match = function(pattern) {\n        if (this.length > 0 && pattern) {\n            return this.filter((i, el) => $(el).text().search(pattern) > -1);\n        }\n        return this;\n    };\n    $.prototype.firstText = function() {\n        const contents = this.first().text();\n        return contents ? contents.replace(/\\s\\s+/g, ' ').trim() : '';\n    };\n    $.prototype.eachText = function(joinWith) {\n        const result = [];\n        this.each((i, el) => result.push($(el).firstText()));\n        if (joinWith) return result.join(joinWith);\n        return result;\n    };\n\n    if (response.status >= 400) throw new Error(`URL: ${url} response status ${response.status}`);\n  \n    if (userData.pageType === 'plp') return handlePlp();\n    return handlePdp();\n\n    async function handlePlp() {\n        log.debug(`${url} PLP`);\n        const count = $('span.js-count-plp').firstText().match(/\\d+/i)[0];\n        log.debug(`${url} PLP count = ${count}`);\n        await waitFor(() => {\n            const showing = $('div.category-wrapper div.category-item > a.category-item__wrapper-link');\n            if (showing.length >= Number(count)) return true;\n            const last = $('div.category-wrapper div.category-item > a.category-item__wrapper-link').last();\n            window.scrollTo(last.offset());\n        }, { timeout: 30000 });\n    }\n\n    async function handlePdp() {\n        log.debug(`${url} PDP`);\n\n        // Check we can get an ID\n        const id = $('div.product-details__code').firstText().replace('Product Ref: ', '');\n        if (!id) {\n            log.debug(`URL: ${url} no ID found`);\n            return;\n        }\n        log.debug(`URL: ${url} ID: ${id}`);\n        const result = {\n            crawlName: 'aldi',\n            url: request.url,\n            productId: id,\n        };\n\n        result.name = $('h1.product-details__name').firstText();\n        result.vintage = getTableValue(/Vintage/i);\n        result.size = getTableValue(/Bottle Size/i) || getAttribute(/Bottle Size/i, true);\n        result.abv = getTableValue(/ABV/i) || getAttribute(/ABV/i, true);\n        result.colour = getAttribute(/Colour:/i) || getAttribute(/Type/i, true);\n        result.grapes = getTableValue(/Grape/i);\n        result.closure = getTableValue(/Closure Type/i);\n        result.rating = $('div.product-ratings__container span.stars svg > defs > clipPath[id^=\"filled\"] > rect').attr('width');\n        result.ratingCount = $('div.product-ratings__container span.count').firstText();\n        result.description = $('div.product-description__text p').eachText('\\n');\n        if (!result.description) result.description = $('div.product-summary').firstText();\n        result.description2 = `${getAttribute(/Aroma/i)}\\n${getAttribute(/Taste/i)}\\n${getAttribute(/Food Matching/i)}`.trim();\n        if (!result.description) {\n            result.description = result.description2;\n            result.description2 = '';\n        }\n        result.country = getTableValue(/Country/i);\n        result.region = getTableValue(/Region/i);\n        // result.region2 = $('').firstText();\n        result.breadcrumbs = $('ul.breadcrumb__list li a').eachText();\n        result.bottleImage = $('picture.product-image-viewer-section__large img').attr('src');\n        const fullScreen = $('picture.product-image-viewer-section__large source[media=\"(min-width: 1025px)\"]').attr('srcset');\n        if (fullScreen) {\n            const sources = fullScreen.split(',');\n            if (sources.length === 2) {\n                result.bottleImage = sources[1].replace(' 2x', '').trim();\n            }\n        }\n        // result.bannerImage = $('').firstText();\n        result.price = $('ul.product-price li span.product-price__value').firstText();\n        const crossout = $('ul.product-price li span.product-price__was').firstText();\n        result.offers = (crossout) ? [`Was £${crossout}`] : [];\n        result.available = $('button#addToBasketButton:disabled').length === 0;\n        result.vegan = getAttribute(/Vegan/i, true) === 'Yes';\n        result.vegetarian = result.vegan || getAttribute(/Vegetarian/i, true) === 'Yes';\n        result.organic = result.name.search(/\\bOrganic\\b/i) > -1;\n        result.fairtrade = result.name.search(/\\Fairtrade\\b/i) > -1;\n        // result.biodynamic = $('').length > 0;\n        return result;\n\n        function getTableValue(pattern) {\n            return $('div.product-glance table tr').match(pattern).next('tr').firstText();\n        }\n\n        function getAttribute(pattern, valueOnly) {\n            const attribute = $('ul.product-attributes__ul li').match(pattern);\n            if (attribute.length === 0) return '';\n            if (valueOnly) return attribute.find('span.product-attributes--bold').firstText();\n            return attribute.firstText();\n        }\n    }\n}",
+  "proxyConfiguration": {
+    "useApifyProxy": false,
+    "url": "http://lum-customer-hl_ccce950f-zone-static-country-gb:8o1x949xjtki@zproxy.lum-superproxy.io:22225"
+  },
+  "debugLog": true,
+  "browserLog": false,
+  "injectJQuery": true,
+  "injectUnderscore": false,
+  "downloadMedia": false,
+  "downloadCss": false,
+  "ignoreSslErrors": false,
+  "maxPagesPerCrawl": 1000
+}
