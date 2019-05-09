@@ -91,6 +91,7 @@ class CrawlerSetup {
 
         // Standard headers
         this.standardHeaders = this.input.headers;
+        this.userAgents = this.input.userAgents;
     }
 
     async _initializeAsync() {
@@ -147,6 +148,10 @@ class CrawlerSetup {
     _prepareRequestFunction({ request }) {
         // Add standard headers
         const useHeaders = { ...request.headers, ...this.standardHeaders };
+        // Add user agent
+        if (this.userAgents && this.userAgents.length > 0) {
+            useHeaders['User-Agent'] = this.userAgents[Math.floor(Math.random() * this.userAgents.length)];
+        }
         // Normalize headers
         request.headers = Object
             .entries(useHeaders)
