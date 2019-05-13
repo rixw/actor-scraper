@@ -1,0 +1,108 @@
+{
+  "startUrls": [
+    {
+      "url": "https://www.lidl.co.uk/en/White-Wine-3659.htm",
+      "method": "GET",
+      "userData": {
+        "pageType": "plp"
+      }
+    },
+    {
+      "url": "https://www.lidl.co.uk/en/Red-Wine-3660.htm",
+      "method": "GET",
+      "userData": {
+        "pageType": "plp"
+      }
+    },
+    {
+      "url": "https://www.lidl.co.uk/en/Rose-Wine-3663.htm",
+      "method": "GET",
+      "userData": {
+        "pageType": "plp"
+      }
+    },
+    {
+      "url": "https://www.lidl.co.uk/en/Champagne-Sparkling-Wine-3662.htm",
+      "method": "GET",
+      "userData": {
+        "pageType": "plp"
+      }
+    },
+    {
+      "url": "https://www.lidl.co.uk/en/Fortified-Wine-13152.htm",
+      "method": "GET",
+      "userData": {
+        "pageType": "plp"
+      }
+    },
+    {
+      "url": "https://www.lidl.co.uk/en/MiddleofLidl.htm?id=48",
+      "method": "GET",
+      "userData": {
+        "pageType": "plp"
+      }
+    },
+    {
+      "url": "https://www.lidl.co.uk/en/MiddleofLidl.htm?id=49",
+      "method": "GET",
+      "userData": {
+        "pageType": "plp"
+      }
+    },
+    {
+      "url": "https://www.lidl.co.uk/en/Products.htm?id=86",
+      "method": "GET",
+      "userData": {
+        "pageType": "plp"
+      }
+    },
+    {
+      "url": "https://www.lidl.co.uk/en/Offers.htm?id=768",
+      "method": "GET",
+      "userData": {
+        "pageType": "plp"
+      }
+    }
+  ],
+  "useRequestQueue": true,
+  "pageFunction": "async function pageFunction(context) {\n    const { $, request, response, log, enqueueRequest } = context;\n    const { url, userData, loadedUrl } = request;\n    const { pageType } = userData;\n\n    $.prototype.match = function (pattern) {\n        if (this.length > 0 && pattern) {\n            return this.filter((i, el) => $(el).text().search(pattern) > -1);\n        }\n        return this;\n    };\n    $.prototype.firstText = function () {\n        const contents = this.first().text();\n        return contents ? contents.replace(/\\s\\s+/g, ' ').trim() : '';\n    };\n    $.prototype.eachText = function (joinWith) {\n        const result = [];\n        this.each((i, el) => result.push($(el).firstText()));\n        if (joinWith) return result.join(joinWith);\n        return result;\n    };\n    $.prototype.eachAttr = function (attr, includeEmpty) {\n        const result = [];\n        this.each((i, el) => result.push($(el).attr(attr)));\n        if (!includeEmpty) return result.filter(x => !!x);\n        return result;\n    };\n\n    if (response.status >= 400) throw new Error(`URL: ${url} response status ${response.status}`);\n\n    try {\n        if (pageType === 'plp') return handlePlp();\n        if (pageType === 'pdp') return handlePdp();\n        throw new Error(`URL: ${url} unrecognised page type \"${pageType}\"`);\n    } catch (e) {\n        context.Apify.setValue(`ERROR-${pageType}`, context.html, { contentType: 'text/html' });\n        throw e;\n    }\n\n    async function handlePlp() {\n        log.debug(`URL: ${url} PLP`);\n        const links = $('ul.productgrid__list li a.product__body').eachAttr('href');\n        for (let i = 0; i < links.length; i++) {\n            if (links[i] && links[i].length > 0) {\n                log.debug(`URL: ${url} PLP => ${links[i]}`);\n                enqueueRequest({\n                    url: fullUrl(links[i], loadedUrl),\n                    userData: {\n                        pageType: 'pdp',\n                    },\n                });\n            }\n        }\n    }\n\n    async function handlePdp() {\n        log.debug(`URL: ${url} PDP`);\n\n        const id = $('div.attributebox[data-id]').data('id');\n        if (!id) {\n            log.debug(`URL: ${url} no ID found`);\n            return;\n        }\n        log.debug(`URL: ${url} ID: ${id}`);\n        const result = {\n            crawlName: 'lidl',\n            url: request.url,\n            productId: id,\n        };\n\n        $('h1[itemprop=\"name\"] sup').remove();\n        result.name = $('h1[itemprop=\"name\"]').firstText();\n        result.vintage = getAttr(/Vintage/i);\n        result.size = $('').firstText();\n        result.abv = getAttr(/ABV/i);\n        if (!result.abv) result.abv = $('div.attributebox__keyfacts ul li').match(/% vol\\./).firstText();\n        // result.rating = $('').firstText();\n        // result.ratingCount = $('').firstText();\n        // result.colour = $('').firstText();\n        // result.grapes = $('').firstText();\n        // result.closure = $('').firstText();\n        const tastingNote = $('article#productbox div.attributebox__details div.textbody p strong').match(/Tasting note/i).next('p');\n        const recipePairing = $('article#productbox div.attributebox__details div.textbody p strong').match(/Recipe pairing/i).next('p');\n        result.description = `${tastingNote} ${recipePairing}`.trim();\n        // result.description2 = $('').firstText();\n        result.country = getAttr(/Region/i);\n        result.region = getAttr(/Region/i);\n        // result.region2 = $('').firstText();\n        result.breadcrumbs = $('div.breadcrumbs ol li.breadcrumbs__item div.breadcrumbs__text').eachText();\n        result.bottleImage = $('article#productbox div.multimediabox link[itemprop=\"image\"]').attr('href');\n        // result.bannerImage = $('').firstText();\n        result.price = $('article#productbox span.pricefield__body strong[itemprop=\"price\"]').attr('content');\n        result.offers = [];\n        result.available = false;\n        // result.vegan = $('').length > 0;\n        // result.vegetarian = $('').length > 0;\n        result.organic = result.name.search(/organic/i) > -1;\n        // result.fairtrade = $('').length > 0;\n        // result.biodynamic = $('').length > 0;\n        return result;\n\n        function getAttr(pattern) {\n            const li = $('div.attributebox__keyfacts ul li strong').match(pattern).parent();\n            const label = $(li).find('strong').firstText();\n            return li.firstText().replace(label, '').trim();\n        }\n    }\n\n    function fullUrl(relative, current) {\n        const urlObj = new URL(relative, current);\n        return urlObj.href;\n    }\n}\n",
+  "proxyConfiguration": {
+    "useApifyProxy": false
+  },
+  "debugLog": true,
+  "ignoreSslErrors": false,
+  "maxRequestRetries": 0,
+  "maxPagesPerCrawl": 500,
+  "maxConcurrency": 5,
+  "pageLoadTimeoutSecs": 30,
+  "requestOptions": {
+    "jar": false
+  },
+  "userAgents": [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:66.0) Gecko/20100101 Firefox/66.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36",
+    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0",
+    "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:66.0) Gecko/20100101 Firefox/66.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.108 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101 Firefox/60.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36 Edge/18.17763",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36 Edge/17.17134"
+  ],
+  "headers": {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Cache-Control": "max-age=0",
+    "Upgrade-Insecure-Requests": 1,
+    "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8"
+  }
+}
